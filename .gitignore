@@ -1,0 +1,15 @@
+.env
+.venv/
+__pycache__/
+lib/
+.DS_Store
+.crewai/
+output/
+# Generated flow plots (crewai flow plot); the review app's page is source, not output
+*.html
+!ui/web/index.html
+.ruff_cache/
+*.tsbuildinfo
+
+# Test runs: crewai local storage
+.crewai-test-storage/

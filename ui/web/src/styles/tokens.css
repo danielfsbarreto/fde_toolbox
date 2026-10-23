@@ -1,0 +1,42 @@
+/* CrewAI design tokens, verbatim from the crewai-design-system skill (references/tokens.md).
+   Components use only these variables. */
+:root {
+  /* accent */
+  --cw-coral: #FF5A50;
+  --cw-coral-deep: #F75A36;
+  /* ink */
+  --cw-black: #000000;
+  --cw-ink: #0D0D0D;
+  --cw-coal: #161616;
+  --cw-ink-soft: #474747;
+  /* neutrals */
+  --cw-white: #FFFFFF;
+  --cw-offwhite: #F5F3F0;
+  --cw-card: #EDEDED;
+  --cw-border: #CCC5B9;
+  --cw-text-secondary: #686868;
+  --cw-text-muted: #8E8E8E;
+  /* type */
+  --cw-font-serif: "EB Garamond", Georgia, "Times New Roman", serif;
+  --cw-font-sans: "Inter", "Carlito", "Calibri", system-ui, sans-serif;
+  --cw-font-mono: "Geist Mono", "Consolas", ui-monospace, monospace;
+  /* radius */
+  --cw-radius-sm: 6px;
+  --cw-radius-md: 12px;
+  --cw-radius-lg: 16px;
+  --cw-radius-pill: 999px;
+  /* shadow */
+  --cw-shadow-sm: 0 1px 2px rgba(22,22,22,0.06);
+  --cw-shadow-md: 0 6px 24px rgba(22,22,22,0.08);
+
+  /* spacing scale (8px base, tokens.md) */
+  --cw-space-1: 4px;
+  --cw-space-2: 8px;
+  --cw-space-3: 12px;
+  --cw-space-4: 16px;
+  --cw-space-6: 24px;
+  --cw-space-8: 32px;
+  --cw-space-12: 48px;
+  --cw-space-16: 64px;
+  --cw-space-24: 96px;
+}

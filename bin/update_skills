@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Refreshes the CrewAI skills the project builder's agents load, from github.com/crewaiinc/skills.
+# Only a shortcut: the work is in flows/project_builder/update_skills.sh.
+exec "$(cd "$(dirname "$0")/.." && pwd)/flows/project_builder/update_skills.sh" "$@"

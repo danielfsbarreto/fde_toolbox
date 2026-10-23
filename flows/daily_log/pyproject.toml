@@ -1,0 +1,34 @@
+[project]
+name = "daily_log"
+version = "0.1.0"
+description = "The FDE Activity Log's daily flow: what happened on each owned account and what else the FDE worked on"
+authors = [{ name = "Daniel Barreto", email = "daniel@crewai.com" }]
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "crewai[tools,anthropic]==1.15.28",
+    "pymongo>=4.18,<5",
+    "pydantic-settings>=2.6,<3",
+    "lingua-language-detector>=2.1,<3",
+    "pyyaml>=6,<7",
+    "python-dotenv>=1.2,<2",
+    "httpx>=0.28,<1",
+    "fde-core",
+]
+
+[tool.uv.sources]
+fde-core = { path = "../../packages/fde_core", editable = true }  # the shared core, in this repository
+
+[project.scripts]
+kickoff = "daily_log.main:kickoff"
+plot = "daily_log.main:plot"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/daily_log"]
+
+[tool.crewai]
+type = "flow"
+project_id = "265f88e0-27ea-4591-9c0f-13708da2d2ff"

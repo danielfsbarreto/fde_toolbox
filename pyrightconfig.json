@@ -1,0 +1,36 @@
+// Import resolution for the editor (Cursor / VS Code / pyright). Each part of the repository has its own
+// environment: the flow's (which also holds the shared core, fde_core) and the review app server's.
+// Add an entry when a flow is added.
+{
+  "venvPath": "flows/daily_log",
+  "venv": ".venv",
+  "pythonVersion": "3.13",
+  "exclude": ["**/node_modules", "**/.venv", "**/__pycache__", "**/dist", "ui/web", "flows/*/tests/stub_llm.py", "flows/project_builder/src/project_builder/skills"],
+  "executionEnvironments": [
+    {
+      "root": "ui/server",
+      "extraPaths": ["ui/server/.venv/lib/python3.13/site-packages"]
+    },
+    { "root": "flows/daily_log/src" },
+    { "root": "flows/account_report/src" },
+    // The project builder's own packages (e2b, the test tools) are not in the daily_log environment. Its code
+    // resolves pymongo from that environment, like fde_core, so the two agree on its types; only the folders
+    // that need the extra packages see the flow's own environment.
+    {
+      "root": "flows/project_builder/tests",
+      "extraPaths": ["flows/project_builder/src", "flows/project_builder/.venv/lib/python3.13/site-packages"]
+    },
+    {
+      "root": "packages/fde_core/tests",  // run with the project builder's environment (it has pytest)
+      "extraPaths": ["flows/project_builder/.venv/lib/python3.13/site-packages"]
+    },
+    {
+      "root": "flows/project_builder/sandbox",
+      "extraPaths": ["flows/project_builder/.venv/lib/python3.13/site-packages"]
+    },
+    { "root": "flows/project_builder/src" },
+    { "root": "packages/fde_core/src" },
+    { "root": "bin" }
+  ]
+}
+

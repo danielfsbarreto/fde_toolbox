@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# Starts the review app (ui/) on this machine, behind ngrok on your static domain (NGROK_DOMAIN).
+#
+#   bin/start            build the frontend when it changed, serve it with the API on :8765, tunnel it
+#   bin/start --dev      Vite dev server with hot reload (API behind it), tunnelled instead
+#   bin/start --secrets  print fresh values for SESSION_SECRET, CALLBACK_ENCRYPTION_KEY and BUILD_ENV_KEY (nothing is saved)
+#
+# Reads ui/.env (see ui/.env.example). The AMP flow and its .env are not involved: this only runs ui/.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+UI="$ROOT/ui"
+ENV_FILE="$UI/.env"
+API_PORT=8765
+WEB_PORT=5173
+unset VIRTUAL_ENV  # the flow's virtualenv must not leak into the review server's
+
+if [[ "${1:-}" == "--secrets" ]]; then
+  echo "SESSION_SECRET=$(openssl rand -hex 32)"
+  echo "CALLBACK_ENCRYPTION_KEY=$(cd "$UI/server" && uv run -q python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')"
+  echo "BUILD_ENV_KEY=$(cd "$UI/server" && uv run -q python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')"
+  exit 0
+fi
+
+required=(NGROK_DOMAIN MONGODB_CONNECTION_STRING HITL_WEBHOOK_SECRET CALLBACK_ENCRYPTION_KEY GITHUB_CLIENT_ID
+  GITHUB_CLIENT_SECRET REVIEW_UI_GITHUB_USERS SESSION_SECRET)
+missing=()
+for key in "${required[@]}"; do
+  grep -qE "^${key}=.+" "$ENV_FILE" 2>/dev/null || missing+=("$key")
+done
+if (( ${#missing[@]} )); then
+  echo "Missing in ui/.env: ${missing[*]}" >&2
+  echo "ui/.env.example says where each one comes from; bin/start --secrets makes the secrets." >&2
+  exit 1
+fi
+DOMAIN="$(grep -E '^NGROK_DOMAIN=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"' | sed -E 's#^https?://##; s#/$##')"
+
+(cd "$UI/server" && uv sync -q)
+[[ -d "$UI/web/node_modules" ]] || npm --prefix "$UI/web" ci --silent
+
+pids=()
+cleanup() { (( ${#pids[@]} )) && kill "${pids[@]}" 2>/dev/null; wait 2>/dev/null; }
+trap cleanup EXIT INT TERM
+
+if [[ "${1:-}" == "--dev" ]]; then
+  npm --prefix "$UI/web" run dev -- --port "$WEB_PORT" --strictPort &
+  pids+=($!)
+  TARGET=$WEB_PORT
+else
+  if [[ ! -f "$UI/web/dist/index.html" ]] || [[ -n "$(find "$UI/web/src" "$UI/web/index.html" "$UI/web/public" -newer "$UI/web/dist/index.html" 2>/dev/null | head -1)" ]]; then
+    echo "Building the frontend…"
+    npm --prefix "$UI/web" run build --silent
+  fi
+  TARGET=$API_PORT
+fi
+
+(cd "$UI/server" && exec uv run -q --env-file "$ENV_FILE" uvicorn review_api.app:app \
+  --host 127.0.0.1 --port "$API_PORT" --proxy-headers --forwarded-allow-ips='*') &
+pids+=($!)
+
+ngrok http "$TARGET" --url "https://$DOMAIN" --log stdout --log-level warn &
+pids+=($!)
+
+cat <<INFO
+
+  Review app   https://$DOMAIN
+  AMP webhook  https://$DOMAIN/api/hitl/webhook   (Deployment > Settings > Human in the Loop > Webhooks)
+  GitHub app   callback URL https://$DOMAIN/auth/callback
+
+  Ctrl-C stops everything.
+INFO
+wait

@@ -1,0 +1,21 @@
+write_section:
+  description: >
+    Write the {account_name} section of an account report covering {period}, in {language}.
+
+    The engineer's goal for the report (it shifts emphasis and tone, never the facts): {comment}
+
+    These are the account's reviewed days. Each topic has a reference (T1, T2, ...):
+
+    {days}
+
+    Write:
+    - summary: where the account stands at the end of the period, in 3 to 5 sentences.
+    - developments: the key developments in date order, at most 8, one or two sentences each, each with its date
+      (one of the days above, YYYY-MM-DD) and the references of the topics it comes from. Merge topics that are the
+      same thread; leave out what does not matter for the reader.
+    - decisions: decisions taken in the period, at most 5, one sentence each, the most important first.
+    - risks: risks and open issues still standing at the end of the period, at most 6, one sentence each, the most
+      important first.
+  expected_output: >
+    A SectionDraft: summary, developments (date, text, topics), decisions and risks, in {language}.
+  agent: report_writer

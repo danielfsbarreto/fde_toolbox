@@ -1,0 +1,40 @@
+[project]
+name = "project_builder"
+version = "0.1.0"
+description = "The FDE Activity Log's project builder: CrewAI projects built conversationally, spec first, by CrewAI agents"
+authors = [{ name = "Daniel Barreto", email = "daniel@crewai.com" }]
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "crewai[anthropic]==1.15.28",
+    "pymongo>=4.18,<5",
+    "pydantic-settings>=2.6,<3",
+    "python-dotenv>=1.2,<2",
+    "fde-core",
+    "e2b>=2,<3",
+    "crewai-tools[exa-py]>=1.15.28",
+]
+
+[tool.uv.sources]
+fde-core = { path = "../../packages/fde_core", editable = true }  # the shared core, in this repository
+
+[project.scripts]
+kickoff = "project_builder.main:kickoff"
+plot = "project_builder.main:plot"
+worker = "project_builder.worker:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "mongomock>=4.3.0",
+    "pytest>=9.1.1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/project_builder"]
+
+[tool.crewai]
+type = "flow"
+project_id = "2c472b63-1bbd-4829-8712-416ac6fa446b"

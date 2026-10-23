@@ -1,0 +1,20 @@
+resolve_action_points:
+  description: >
+    The daily log is for {day}, a {weekday}. These follow-ups come from it:
+
+    {items}
+
+    Return one entry per item, with its id:
+    - due_date: only for items with "due as stated". The date it means as YYYY-MM-DD, read relative to {day}:
+      "tomorrow" is the day after {day}; a weekday name is the next such day after {day}; "this week" or "over
+      the week" is the Friday of that week; "next week" is the Monday after it. Leave it empty when the stated
+      due is not a date ("soon", "when possible").
+    - target: only for items with "targets". The one that fits the follow-up and its topic best, copied exactly;
+      the first one when none fits better.
+
+    Guidance from the FDE, learned from their reviews. Follow it over your own defaults, but never against the
+    evidence:
+    {guidance}
+  expected_output: >
+    An ActionPointResolution with one entry per item.
+  agent: action_point_planner

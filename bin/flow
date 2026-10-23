@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# Runs a command inside one flow's project (flows/<name>): its own environment, pyproject.toml and .env.
+# uv has no task runner; this is the one entry point for every flow, from anywhere in the repository.
+#
+#   bin/flow                                              list the flows
+#   bin/flow daily_log kickoff                            run the previous workday locally (real run)
+#   bin/flow daily_log kickoff '{"date": "2026-10-08"}'   run one day locally (real run)
+#   bin/flow daily_log crewai run                         the same, through the CrewAI CLI
+#   bin/flow daily_log crewai eval                        grade the last traced run
+#   bin/flow daily_log plot                               draw the flow (crewai flow plot)
+#   bin/flow daily_log sync                               install its dependencies (uv sync)
+#   bin/flow daily_log lock                               update its uv.lock (uv lock)
+#   bin/flow daily_log python bin/init_db.py              a script, with the flow's environment and .env
+#   bin/flow daily_log python -c "import daily_log"       anything else runs as `uv run <command>`
+#
+# Deploying is separate: bin/deploy.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+flows() { for dir in "$ROOT"/flows/*/; do [[ -f "$dir/pyproject.toml" ]] && basename "$dir"; done; }
+
+if (( $# == 0 )); then
+  echo "Flows (bin/flow <name> <command>; bin/flow --help for examples):"
+  flows | sed 's/^/  /'
+  exit 0
+fi
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+  sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
+  exit 0
+fi
+
+name="$1"
+shift
+dir="$ROOT/flows/$name"
+if [[ ! -f "$dir/pyproject.toml" ]]; then
+  echo "No flow named '$name'. Flows: $(flows | tr '\n' ' ')" >&2
+  exit 2
+fi
+if (( $# == 0 )); then
+  echo "Usage: bin/flow $name <command> (bin/flow --help for examples)" >&2
+  exit 2
+fi
+
+# `python <file>`: the file is taken from where you typed it (e.g. bin/init_db.py), before moving into the flow
+if [[ "$1" == "python" && $# -ge 2 && -f "$2" ]]; then
+  set -- "$1" "$(cd "$(dirname "$2")" && pwd)/$(basename "$2")" "${@:3}"
+fi
+
+cd "$dir"
+unset VIRTUAL_ENV  # another project's environment must not leak into this one
+case "$1" in
+  sync | lock) exec uv "$@" ;;
+  *) exec uv run "$@" ;;
+esac

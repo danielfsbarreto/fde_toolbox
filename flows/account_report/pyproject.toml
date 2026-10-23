@@ -1,0 +1,32 @@
+[project]
+name = "account_report"
+version = "0.1.0"
+description = "The FDE Activity Log's account report: a period of final days for some accounts, written up for a reader"
+authors = [{ name = "Daniel Barreto", email = "daniel@crewai.com" }]
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "crewai[anthropic]==1.15.28",
+    "pymongo>=4.18,<5",
+    "pydantic-settings>=2.6,<3",
+    "python-dotenv>=1.2,<2",
+    "httpx>=0.28,<1",
+    "fde-core",
+]
+
+[tool.uv.sources]
+fde-core = { path = "../../packages/fde_core", editable = true }  # the shared core, in this repository
+
+[project.scripts]
+kickoff = "account_report.main:kickoff"
+plot = "account_report.main:plot"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/account_report"]
+
+[tool.crewai]
+type = "flow"
+project_id = "327f3fd3-fff0-47b2-b0ac-e286ab163a45"

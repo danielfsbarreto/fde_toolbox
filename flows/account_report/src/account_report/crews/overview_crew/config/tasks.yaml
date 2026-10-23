@@ -1,0 +1,18 @@
+write_overview:
+  description: >
+    Write the title and overview of an account report covering {period}, in {language}.
+
+    The engineer's goal for the report (it shifts emphasis and tone, never the facts): {comment}
+
+    The report's sections:
+
+    {sections}
+
+    Days in the period with no reviewed log (the report does not cover them): {missing}
+
+    Write a short title (at most 10 words, no dates: the period is shown next to it), and an overview of one to three paragraphs across the accounts: where things stand, what
+    changed, and what needs attention next. For a single account, frame it in a few sentences without repeating the
+    section's summary.
+  expected_output: >
+    An OverviewDraft: title and overview, in {language}.
+  agent: report_editor

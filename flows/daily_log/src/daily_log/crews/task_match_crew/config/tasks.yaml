@@ -1,0 +1,18 @@
+match_tasks:
+  description: >
+    These follow-ups come from the daily log of {day}. Under each one are the open Todoist tasks where it would
+    land (the customer's workspace and the Inbox):
+
+    {items}
+
+    For each follow-up, decide whether one of its candidates already covers it: the same action, deliverable or
+    ask (to the same person or team), even if worded differently or in another language. When one does, return its
+    id, copied exactly. When none does, leave task_id empty: a new task is created. Same customer or same topic is
+    not enough; when in doubt, leave it empty. Give a one-sentence reason either way.
+
+    Guidance from the FDE, learned from their reviews. Follow it over your own defaults, but never against the
+    evidence:
+    {guidance}
+  expected_output: >
+    A TaskMatching with one entry per follow-up, with its id.
+  agent: task_matcher

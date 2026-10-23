@@ -1,0 +1,256 @@
+#!/usr/bin/env bash
+# Deploys the FDE Activity Log: its flows to CrewAI AMP and the review app (ui/) to Heroku, at the same time, each
+# line of output prefixed [amp] or [heroku], and a summary at the end.
+#
+#   bin/deploy                      everything (same as --all)
+#   bin/deploy --amp                only the flows, to AMP (every flow with a deployment)
+#   bin/deploy --flow account_report  only that flow (repeatable); implies --amp unless --heroku is given too
+#   bin/deploy --heroku             only the review app, to Heroku
+#   bin/deploy --all --force        everything; --force replaces Heroku's history (after amending a deployed commit)
+#   bin/deploy --dry-run            checks only: show what would be deployed
+#
+#   AMP:     --every <s> (status checks, default 15)   --timeout <s> (give up following, default 900)
+#            --no-validate   --status-only (only follow the status)
+#   Heroku:  --no-check (skip the local Docker build)   --force
+#
+# AMP builds from GitHub (origin): push your commits first; it checks. Each flow's deployment uses its folder as the
+# working directory (Settings > Working directory, auto-deploy off); its UUID is in FLOWS below. Heroku gets only
+# the committed ui/ folder (git subtree split); app $HEROKU_APP, or fde-activity-log, through the `heroku` remote.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+HEROKU_APP="${HEROKU_APP:-fde-activity-log}"
+
+# Each flow (flows/<name>) and its AMP deployment: by UUID, since names can change in AMP. "-" until it exists:
+# create it in AMP with its folder as working directory, then put its UUID here.
+FLOWS=(
+  "daily_log 4ac2579d-b286-4003-a5f0-409124a6f7c7"       # "FDE Daily Log" on AMP
+  "account_report 2231b0f1-8854-486c-a1a9-b9d698519587"  # "FDE Account Report" on AMP
+  "project_builder 02b8b909-7e7c-4012-bceb-e93c2230291a" # "FDE Project Builder" on AMP (conversational)
+)
+
+AMP=0 HEROKU=0 DRY=0
+EVERY=15 TIMEOUT=900 VALIDATE=1 FOLLOW_ONLY=0 CHOSEN=()
+CHECK=1 FORCE=""
+while (( $# )); do
+  case "$1" in
+    --all) AMP=1 HEROKU=1 ;;
+    --amp) AMP=1 ;;
+    --flow) CHOSEN+=("${2:?--flow needs a flow name}"); shift ;;
+    --heroku) HEROKU=1 ;;
+    --dry-run) DRY=1 ;;
+    --every) EVERY="${2:?--every needs seconds}"; shift ;;
+    --timeout) TIMEOUT="${2:?--timeout needs seconds}"; shift ;;
+    --no-validate) VALIDATE=0 ;;
+    --status-only) FOLLOW_ONLY=1 ;;
+    --no-check) CHECK=0 ;;
+    --force) FORCE="--force" ;;
+    -h | --help) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "Unknown option: $1 (see bin/deploy --help)" >&2; exit 2 ;;
+  esac
+  shift
+done
+(( ${#CHOSEN[@]} )) && AMP=1
+if (( !AMP && !HEROKU )); then
+  if (( FOLLOW_ONLY )); then AMP=1; else AMP=1 HEROKU=1; fi  # nothing chosen: everything (--status-only is AMP's)
+fi
+
+# The flows to deploy: the ones named with --flow, or every flow that has a deployment
+NAMES=() UUIDS=() SKIPPED=()
+for entry in "${FLOWS[@]}"; do
+  read -r name uuid <<<"$entry"
+  if (( ${#CHOSEN[@]} )) && [[ " ${CHOSEN[*]} " != *" $name "* ]]; then continue; fi
+  if [[ "$uuid" == "-" ]]; then SKIPPED+=("$name"); continue; fi
+  NAMES+=("$name") UUIDS+=("$uuid")
+done
+for name in ${CHOSEN[@]+"${CHOSEN[@]}"}; do
+  if ! printf '%s\n' "${FLOWS[@]}" | grep -q "^$name "; then
+    echo "No flow named '$name'. Flows: $(printf '%s\n' "${FLOWS[@]}" | cut -d' ' -f1 | tr '\n' ' ')" >&2
+    exit 2
+  fi
+done
+cd "$ROOT"
+unset VIRTUAL_ENV  # another project's environment must not leak into a flow's
+stamp() { date '+%H:%M:%S'; }
+
+# AMP ----------------------------------------------------------------------------------------------------------------
+
+deploy_amp() {
+  crewai_in() { local flow="$1"; shift; (cd "$ROOT/flows/$flow" && uv run -q crewai "$@"); }
+  local name
+  for name in ${SKIPPED[@]+"${SKIPPED[@]}"}; do
+    echo "flows/$name has no AMP deployment yet (FLOWS in bin/deploy): skipped"
+  done
+  if (( ${#UUIDS[@]} == 0 )); then
+    echo "No flow to deploy." >&2
+    return 1
+  fi
+  local i
+  if (( !FOLLOW_ONLY )); then
+    # AMP builds what is on GitHub. Only what it builds matters: the flows, the shared core, the root lint settings.
+    local paths=() branch latest
+    for name in "${NAMES[@]}"; do paths+=("flows/$name"); done
+    paths+=(packages pyproject.toml)
+    if [[ -n "$(git status --porcelain -- "${paths[@]}")" ]]; then
+      echo "Uncommitted changes in a flow; AMP builds from GitHub, so commit and push them first:" >&2
+      git status --short -- "${paths[@]}" >&2
+      return 1
+    fi
+    git fetch -q origin
+    branch="$(git rev-parse --abbrev-ref HEAD)"
+    latest="$(git log -1 --format=%H -- "${paths[@]}")"
+    if ! git merge-base --is-ancestor "$latest" "origin/$branch" 2>/dev/null; then
+      echo "The latest flow change ($(git log -1 --format='%h %s' "$latest")) is not on GitHub yet; AMP builds from it:" >&2
+      echo "  git push origin $branch   then deploy again." >&2
+      return 1
+    fi
+    echo "[$(stamp)] Deploying ${NAMES[*]} at $(git log -1 --format='%h %s' "$latest")"
+    if (( DRY )); then
+      for i in "${!NAMES[@]}"; do
+        echo "Dry run: would validate flows/${NAMES[i]}, then run  crewai deploy push -u ${UUIDS[i]}"
+      done
+      return 0
+    fi
+    for i in "${!NAMES[@]}"; do
+      if (( VALIDATE )); then
+        echo "[$(stamp)] ${NAMES[i]}: crewai deploy validate"
+        crewai_in "${NAMES[i]}" deploy validate
+      fi
+      echo "[$(stamp)] ${NAMES[i]}: crewai deploy push -u ${UUIDS[i]}"
+      crewai_in "${NAMES[i]}" deploy push -u "${UUIDS[i]}" --skip-validate
+    done
+  fi
+
+  # Follow every deployment until it is Online again (after leaving Online, or still Online after a grace period).
+  # Plain indexed arrays, so it runs on macOS's bash 3.2 too.
+  local last=() left=() ready=() out label status elapsed pending start grace=120
+  for i in "${!UUIDS[@]}"; do last[i]="" left[i]=0 ready[i]=0; done
+  start=$(date +%s)
+  while :; do
+    pending=0
+    for i in "${!UUIDS[@]}"; do
+      (( ready[i] )) && continue
+      out="$(crewai_in "${NAMES[i]}" deploy status -u "${UUIDS[i]}" 2>&1 || true)"
+      if grep -q "crewai login" <<<"$out"; then
+        echo "The CrewAI CLI is signed out: run  bin/flow ${NAMES[i]} crewai login  and deploy again." >&2
+        return 1
+      fi
+      label="$(sed -n 's/^Name: *//p' <<<"$out" | head -1)"
+      label="${label:-${NAMES[i]}}"
+      status="$(sed -n 's/^Status: *//p' <<<"$out" | head -1)"
+      [[ -n "$status" ]] || status="$(tail -1 <<<"$out")"
+      if [[ "$status" != "${last[i]}" ]]; then
+        echo "[$(stamp)] $label: $status"
+        last[i]="$status"
+      fi
+      elapsed=$(( $(date +%s) - start ))
+      # A failed deployment reports its cause in Error: and Fix: blocks (several lines each): show them and stop
+      local problem
+      problem="$(awk '/^Error:/ { on = 1 } /^[A-Z][A-Za-z_]*:/ && !/^(Error|Fix):/ { on = 0 } on' <<<"$out")"
+      if [[ -n "$problem" && "$problem" != *"Error:"*"None"* ]] || grep -qiE "fail|error|crash" <<<"$status"; then
+        echo "[$(stamp)] $label failed." >&2
+        [[ -n "$problem" ]] && sed 's/^/    /' <<<"$problem" >&2
+        echo "    Logs: bin/flow ${NAMES[i]} crewai deploy logs -u ${UUIDS[i]}" >&2
+        return 1
+      elif grep -qi "online" <<<"$status"; then
+        if (( left[i] || FOLLOW_ONLY || elapsed >= grace )); then
+          echo "[$(stamp)] $label is Online"
+          ready[i]=1
+          continue
+        fi
+      else
+        left[i]=1
+      fi
+      pending=1
+    done
+    (( pending )) || { echo "[$(stamp)] Online."; return 0; }
+    if (( $(date +%s) - start >= TIMEOUT )); then
+      echo "[$(stamp)] Still not Online after ${TIMEOUT}s. Check: bin/flow <flow> crewai deploy status -u <uuid>" >&2
+      return 1
+    fi
+    sleep "$EVERY"
+  done
+}
+
+# Heroku -------------------------------------------------------------------------------------------------------------
+
+deploy_heroku() {
+  git remote get-url heroku >/dev/null 2>&1 || {
+    echo "No 'heroku' git remote: run heroku git:remote -a $HEROKU_APP" >&2
+    return 1
+  }
+  if [[ -n "$(git status --porcelain -- ui)" ]]; then
+    echo "ui/ has uncommitted changes; Heroku only gets committed files. Commit them first:" >&2
+    git status --short -- ui >&2
+    return 1
+  fi
+  local commit
+  commit="$(git subtree split -q --prefix ui | tr -d '[:space:]')"
+  echo "Deploying ui/ at $(git log -1 --format='%h %s' -- ui) (subtree ${commit:0:8}) to $HEROKU_APP"
+  if (( CHECK )); then
+    echo "Checking the committed ui/ builds as Heroku will build it…"
+    git archive HEAD:ui | docker build --platform linux/amd64 -q -t fde-review-app:check - >/dev/null
+    echo "  build ok"
+  fi
+  if (( DRY )); then
+    echo "Dry run: would run  git push heroku ${commit}:refs/heads/main ${FORCE}"
+    return 0
+  fi
+  local pushed
+  set +e
+  git push heroku "${commit}:refs/heads/main" $FORCE 2>&1 | grep -v '^hint:'  # git's hint says to pull: wrong here
+  pushed=${PIPESTATUS[0]}
+  set -e
+  if (( pushed != 0 )); then
+    if [[ -z "$FORCE" ]]; then
+      echo "Heroku has a ui/ history this one does not continue (usually an amended or rebased commit)." >&2
+      echo "Do not pull: run  bin/deploy --heroku --force  (it only replaces Heroku's copy; releases and rollback stay)." >&2
+    fi
+    return 1
+  fi
+  local url code
+  url="$(heroku apps:info -a "$HEROKU_APP" --json 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin)["app"]["web_url"].rstrip("/"))')"
+  echo "Waiting for $url to answer…"
+  for _ in $(seq 1 40); do
+    code="$(curl -s -m 5 -o /dev/null -w '%{http_code}' "$url/api/me" || true)"
+    if [[ "$code" == "401" ]]; then
+      echo "  up (sign-in required, as expected)"
+      heroku ps -a "$HEROKU_APP" 2>/dev/null | grep -E '^web' || true
+      return 0
+    fi
+    sleep 3
+  done
+  echo "The app did not answer within 2 minutes: heroku logs --tail -a $HEROKU_APP" >&2
+  return 1
+}
+
+# Both, side by side ---------------------------------------------------------------------------------------------------
+
+# One target in a subshell (a failure stops only that one), its output prefixed; its exit status is the job's
+run() {
+  local name="$1" target="$2"
+  set +e
+  ( set -euo pipefail; "$target" ) 2>&1 | awk -v prefix="[$name] " '{ print prefix $0; fflush() }'
+  local status=${PIPESTATUS[0]}
+  set -e
+  return "$status"
+}
+
+names=() pids=()
+if (( AMP )); then run amp deploy_amp & names+=(amp) pids+=($!); fi
+if (( HEROKU )); then run heroku deploy_heroku & names+=(heroku) pids+=($!); fi
+
+failed=0
+summary=()
+for i in "${!pids[@]}"; do
+  if wait "${pids[i]}"; then
+    summary+=("  ${names[i]}: done")
+  else
+    summary+=("  ${names[i]}: FAILED (see its [${names[i]}] lines above)")
+    failed=1
+  fi
+done
+echo
+echo "Deploy summary:"
+printf '%s\n' "${summary[@]}"
+exit "$failed"

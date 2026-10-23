@@ -1,0 +1,43 @@
+# FDE profile. One file per FDE, named <fde_id>.yaml, in this folder. It ships with the code,
+# so a change takes effect on the next deploy. Start a new FDE from example.yaml.
+#
+# Identifiers only. Sources are read through the FDE's own CrewAI AMP connections
+# (CREWAI_PLATFORM_INTEGRATION_TOKEN of that FDE), and the FDE's ids in each app
+# (Slack user, GitHub login, Linear user...) are discovered at run time.
+
+schema_version: 1
+fde_id: daniel-barreto               # lowercase, used as the key everywhere
+name: Daniel Barreto
+emails: [email@danielbarreto.me]     # finds this profile from the connected account; marks "me"
+timezone: America/Recife             # defines the day window
+output_language: en                  # language of the generated log
+
+sources:                             # turn a source off with enabled: false
+  gmail: { enabled: true }
+  calendar: { enabled: true, calendar_ids: [primary] }
+  slack: { enabled: true }
+  teams: { enabled: true }
+  github: { enabled: true, orgs: [crewAIInc, crewAIInc-FDE] }
+  linear: { enabled: true }
+  fathom: { enabled: true }
+  granola: { enabled: true }
+
+owned_accounts:                      # the accounts this FDE is accountable for
+  - key: customer_key                      # lowercase; not "internal" or "unassigned"
+    name: Customer Name
+    description: "Closed customer"   # what the engagement is: use case, products, projects
+    aliases: []                      # other names, e.g. "Customer Corp"; also used to find channels and repos
+    email_domains: [customer.domain.com]   # emails, attendees, chat and channel members, Linear link
+    todoist: Todoist Project / Customer section   # where action points go: "Project / Section" (needs TODOIST_API_KEY)
+    # Optional overrides, only for places whose name never mentions the account:
+    # slack_channels: [C0123ABCD]
+    # teams_channels: ["Team name/Channel name"]
+    # github_repos: [owner/repo]
+    # linear_customer_ids: [<id>]
+
+internal:
+  email_domains: [companydomain.com]          # colleagues, never a customer
+  partner_email_domains: [partnerdomain.com]  # partners building customer use cases with us; treated like colleagues
+  slack_channels: []                          # internal channels worth tracking (IDs)
+  keywords: []                                # internal initiatives worth tracking
+  todoist: Company - General                  # where internal action points go (project root)

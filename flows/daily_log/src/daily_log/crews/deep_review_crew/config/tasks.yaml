@@ -1,0 +1,42 @@
+review_day:
+  description: >
+    The engineer's request, about {scope}:
+
+    <request>
+    {instruction}
+    </request>
+
+    Accounts (key: name). "internal" is CrewAI work with no customer of theirs; "unassigned" is unclear work:
+
+    {accounts}
+
+    Topics in scope (as the engineer left them):
+
+    {topics}
+
+    Events in scope (ref | time | source | who | where | title, then the text):
+
+    {events}
+
+    Return only what the request changes:
+    - changed_topics: topics in scope rewritten as the request asks, each with its id. Keep everything the request
+      does not touch exactly as it is (title, fields, follow-ups). A topic can move to another account by its
+      account_key. evidence: the refs of the events that support it.
+    - new_topics: what the topics missed that the request is about and the events show (a missed angle, a
+      decision, a risk, something the engineer mentions). No id. Each cites the refs of its events and has an
+      account_key. Do not repeat what an existing topic already covers; change that topic instead.
+    - notes: one short sentence for each part of the request you could not do or find in the events.
+    Write in {output_language}; keep names, PR and issue titles and direct quotes in their original language.
+    Fields: what_happened 1 to 3 concrete sentences; status_or_decision only if the events show one; risks only
+    risks the events show; follow_ups only next actions the events state, with owner and due_if_stated only when
+    stated; my_involvement led, contributed or observed; confidence high, medium or low; inferred true when any
+    statement goes beyond the events.
+    Style: no em-dashes, no hype, no filler. Never comment on the data itself (truncation, refs, sources).
+    An empty answer (no changes, a note) is right when the events do not support the request.
+
+    Guidance from the FDE, learned from their reviews. Follow it over your own defaults, but never against the
+    evidence:
+    {guidance}
+  expected_output: >
+    A DeepReview with changed_topics, new_topics and notes.
+  agent: deep_reviewer

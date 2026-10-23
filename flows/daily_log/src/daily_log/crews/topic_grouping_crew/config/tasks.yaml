@@ -1,0 +1,35 @@
+group_topics:
+  description: >
+    One day of the engineer's activity, as conversation clusters. Each cluster says which account rules put it
+    under ("currently") and why; clusters marked "fixed" belong to that account for certain. Events are cited by
+    ref (e.g. e12).
+
+    Customer accounts this engineer owns:
+
+    {accounts}
+
+    {clusters}
+
+    Produce the topics addressed that day:
+
+    - A topic is one subject being worked on or discussed (a use case, an incident, a deliverable, a meeting's
+      agenda item, a hiring loop). Merge clusters about the same subject, even across tools and accounts' sections.
+      Split a cluster when it clearly covers unrelated subjects.
+    - Every event ref must appear in exactly one topic. Put small talk, greetings and noise together in one topic
+      titled "Other conversations" with workstream "other".
+    - account_key: one of the account keys above, "internal" or "unassigned".
+      Topics made of "fixed" clusters keep that account. For other clusters, file the topic under the account the
+      content is about: a customer mentioned only in passing does not make it that customer's topic. Work about a
+      customer that is not in the list above (another engineer's customer, a prospect) is "internal". Use
+      "unassigned" only when you cannot tell what the work is about.
+    - confidence: how sure the account is. reason: one short sentence naming the evidence when the account differs
+      from the clusters' current account (e.g. "discusses the <CUSTOMER> email-triage use case"); empty otherwise.
+    - workstream: pre-sales, poc, enablement, support, delivery, internal-initiative, hiring, events or other.
+    - title: short and specific, in {output_language}; keep product, customer and project names as written.
+
+    Guidance from the FDE, learned from their reviews. Follow it over your own defaults, but never against the
+    evidence:
+    {guidance}
+  expected_output: >
+    A GroupingOutput: topics with title, workstream, account_key, event_refs, confidence and reason.
+  agent: topic_grouper

@@ -1,0 +1,24 @@
+# The FDE Activity Log: one repository, several deployables, one shared core.
+#   packages/fde_core   the shared contract: daily log models and MongoDB access (no CrewAI)
+#   flows/daily_log     the daily log flow (package daily_log): AMP deployment, working directory flows/daily_log
+#   flows/account_report  the account report flow (package account_report): its own AMP deployment
+#   flows/project_builder the project builder (package project_builder): a conversational flow, its own AMP deployment
+#   ui/                 the review app (Heroku, self-contained)
+# Each flow is its own uv project with its own uv.lock, and depends on fde_core by path; AMP pulls the whole
+# repository and builds the flow from its folder (the deployment's working directory).
+# This file only holds the shared lint settings; uv does not manage the root (no lock or environment here).
+
+[tool.uv]
+managed = false
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"  # the flows support Python 3.10 (requires-python)
+# Copied from github.com/crewaiinc/skills as they are (update_skills.sh), not ours to restyle
+extend-exclude = ["flows/project_builder/src/project_builder/skills", "flows/*/tests/stub_llm.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["fde_core", "daily_log", "account_report", "project_builder"]

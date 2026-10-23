@@ -1,0 +1,42 @@
+write_topics:
+  description: >
+    Write the daily log entries for {account_name} ({account_key}). {account_description}
+    The engineer is {fde_name}. Write in {output_language}; keep names, PR and issue titles and direct quotes
+    in their original language.
+
+    Topics to write (title, workstream and the events of each):
+
+    {groups}
+
+    Events (ref | time | source | who | where | text):
+
+    {events}
+
+    {feedback}
+
+    For each topic write:
+    - what_happened: 1 to 3 sentences on what was addressed and what changed. Concrete, no filler.
+    - status_or_decision: the current status or the decision taken, only if the events show one.
+    - risks: only risks the events show (blockers, delays, unhappy customer, missing access).
+    - my_involvement: led (the engineer drove it), contributed (took part), or observed (others only).
+    - follow_ups: next actions the events state. owner and due_if_stated only when the events say them.
+    - people: people involved, by name.
+    - evidence: the refs of the events that support the topic; every topic cites at least one ref listed above.
+    - confidence: high when the events state it directly, medium when partly, low when thin.
+    - inferred: true when any statement goes beyond what the events say.
+    Keep the topics' titles and workstreams unless the events clearly contradict them.
+
+    headline: one sentence on the account's day (what moved, what is blocked). For "internal" and "unassigned",
+    summarize the section in one sentence.
+
+    Style: no em-dashes, no hype, no filler words. Short sentences.
+    Write only about the work. Never comment on the data itself: truncated or missing text, labels such as
+    "participated" or "authored", refs, sources or what the events do not show. If something is unknown, leave
+    the field empty instead of saying it is unknown.
+
+    Guidance from the FDE, learned from their reviews. Follow it over your own defaults, but never against the
+    evidence:
+    {guidance}
+  expected_output: >
+    A SynthesisOutput with a headline and one entry per topic.
+  agent: topic_writer

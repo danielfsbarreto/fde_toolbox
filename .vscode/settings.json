@@ -1,0 +1,5 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/flows/daily_log/.venv/bin/python",
+  "python.terminal.activateEnvironment": false,
+  "search.exclude": { "**/.venv": true, "**/node_modules": true, "ui/web/dist": true }
+}
